@@ -42,9 +42,18 @@ class Event:
             raise ValueError("event_type must be EventType")
         self.event_type = event_type
 
+    def get_node(self):
+        if self.event_type == EventType.SEND:
+            return self.message.source
+        else:
+            return self.message.destination
+
     def print_event(self) -> None:
         print(
-            f"[Event {self.id}] {self.event_type.value} | "
+            f"[Event {self.id}] "
+            f"Time: {self.time:.3f} | "
+            f"Node: {self.get_node()} | "
+            f"{self.event_type.value} | "
             f"MsgID: {self.message.id} | "
             f"{self.message.source} -> {self.message.destination}"
         )
