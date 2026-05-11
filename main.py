@@ -1,3 +1,4 @@
+import itertools
 from client import Client
 from gateway import Gateway
 from my_queue import Queue
@@ -8,13 +9,52 @@ from server import Server
 
 
 class Engine:
-    def __init__(self, num_of_servers=1, queue_size=float("inf")) -> None:
+    MODELS = {
+        "M/M/1": (1, float("inf")),
+        "M/M/1/4": (1, 3),
+        "M/M/1/8": (1, 7),
+        "M/M/3/8": (3, 5),
+    }
+
+    def reset(self) -> None:
+        Client.client_id_iter = itertools.count(1)
+        Message.msg_id_iter = itertools.count()
+        Server.server_id_iter = itertools.count()
+        Event.event_id_iter = itertools.count()
         self.clients = []
         self.current_time = 0.0
         self.scheduler = Scheduler()
         self.gateway = Gateway(
-            self.scheduler, num_of_servers=num_of_servers, queue_size=queue_size
+            self.scheduler,
+            num_of_servers=self.num_of_servers,
+            queue_size=self.queue_size,
+            mu=self.mu,
         )
+
+    def __init__(self, num_of_servers=1, queue_size=float("inf"), mu=8) -> None:
+        self.num_of_servers = num_of_servers
+        self.queue_size = queue_size
+        self.mu = mu
+        self.clients = []
+        self.current_time = 0.0
+        self.scheduler = Scheduler()
+        self.gateway = Gateway(
+            self.scheduler,
+            num_of_servers=num_of_servers,
+            queue_size=queue_size,
+            mu=mu,
+        )
+
+    # def __init__(self, num_of_servers=1, queue_size=float("inf"), mu=8) -> None:
+    #     self.clients = []
+    #     self.current_time = 0.0
+    #     self.scheduler = Scheduler()
+    #     self.gateway = Gateway(
+    #         self.scheduler,
+    #         num_of_servers=num_of_servers,
+    #         queue_size=queue_size,
+    #         mu=mu,
+    #     )
 
     def create_clients(self, n_clients: int, lam=4) -> None:
         self.clients.extend(
@@ -66,14 +106,12 @@ class Engine:
 
             elif event_type == EventType.DEPT:
                 message.departure_time = self.current_time
-                self.gateway.total_sojourn_time += message.get_sojourn_time()
-                self.gateway.total_served += 1
+                self.gateway.update_departure_metrics(message)
                 self.gateway.release_server(message, self.current_time)
 
         self.gateway.print_stats()
 
     def test_message(self) -> None:
-        print("\n--- Test Message ---")
         m1 = Message(1, 0)
         m2 = Message(2, 0)
 
@@ -90,7 +128,6 @@ class Engine:
             print(f"  sojourn time: {m.get_sojourn_time():.3f}")
 
     def test_event(self) -> None:
-        print("\n--- Test Event ---")
         e1 = Event(Message(1, 0), EventType.SEND, 1.0)
         e2 = Event(Message(2, 0), EventType.RECV, 2.0)
         e3 = Event(Message(3, 0), EventType.DEPT, 3.0)
@@ -98,7 +135,6 @@ class Engine:
             e.print_event()
 
     def test_scheduler(self) -> None:
-        print("\n--- Test Scheduler ---")
         scheduler = Scheduler()
         m1 = Message(1, 0)
         m2 = Message(2, 0)
@@ -115,7 +151,6 @@ class Engine:
             event.print_event()
 
     def test_queue(self) -> None:
-        print("\n--- Test Queue ---")
         # test normal enqueue/dequeue
         q = Queue(3)
         m1 = Message(1, 0)
@@ -133,7 +168,6 @@ class Engine:
             m.print_message()
 
     def test_client(self) -> None:
-        print("\n--- Test Client ---")
         scheduler = Scheduler()
         client = Client(scheduler, lam=4)
         # generate 5 messages
@@ -157,7 +191,6 @@ class Engine:
                 break
 
     def test_server(self) -> None:
-        print("\n--- Test Server ---")
         scheduler = Scheduler()
         server = Server(scheduler, mu=8)
         print(f"Server {server.id} busy: {server.is_busy()}")
@@ -168,18 +201,17 @@ class Engine:
         print(f"Server {server.id} busy: {server.is_busy()}")
         print(f"Server {server.id} current message: {server.current_message.id}")
         # create dept event
-        event = server.create_event(m1, 1.0)
+        event = server.get_service(m1, 1.0)
         event.print_event()
         # release server
         server.set_busy(False, None)
         print(f"Server {server.id} busy after release: {server.is_busy()}")
         # assign second message
         server.set_busy(True, m2)
-        event = server.create_event(m2, 2.0)
+        event = server.get_service(m2, 2.0)
         event.print_event()
 
     def test_gateway(self, num_of_servers=1, queue_size=4) -> None:
-        print("\n--- Test Gateway ---")
         scheduler = Scheduler()
         gateway = Gateway(
             scheduler, num_of_servers=num_of_servers, queue_size=queue_size
@@ -187,38 +219,43 @@ class Engine:
         # simulate messages arriving
         messages = [Message(i, 0) for i in range(6)]
         current_time = 1.0
+
         print(
             f"Sending {len(messages)} messages to gateway with "
             f"{num_of_servers} server(s) and queue size {queue_size}"
         )
+
         for msg in messages:
-            gateway.receive_message(msg, current_time)
+            message = gateway.receive_message(msg, current_time)
             current_time += 0.5
+
         print(f"\nAfter arrivals:")
         print(f"Queue size:     {len(gateway.queue)}")
         print(f"Total arrived:  {gateway.total_arrived}")
         print(f"Total dropped:  {gateway.total_dropped}")
         # process some departures
         print("\nProcessing departures:")
+
         while (event := scheduler.get_event()) is not None:
             msg = event.get_message()
             msg.departure_time = event.get_time()
-            gateway.total_sojourn_time += msg.get_sojourn_time()
-            gateway.total_served += 1
+            gateway.update_departure_metrics(msg)
             gateway.release_server(msg, event.get_time())
+
         gateway.print_stats()
 
 
 if __name__ == "__main__":
     # M/M/1
-    engine = Engine(num_of_servers=1, queue_size=float("inf"))
-    engine.run(num_of_clients=3, lam=4, sim_time=100.0)
+    engine = Engine(num_of_servers=2, queue_size=4)
+    # engine.test_gateway()
 
     # # M/M/1/4
-    # Engine(num_of_servers=1, queue_size=4).run(lam=4, sim_time=100.0)
+    # engine = Engine(num_of_servers=1, queue_size=12)
     #
     # # M/M/1/8
-    # Engine(num_of_servers=1, queue_size=8).run(lam=4, sim_time=100.0)
+    # Engine(num_of_servers=1, queue_size=8)
     #
     # # M/M/3/8
-    # Engine(num_of_servers=3, queue_size=8).run(lam=4, sim_time=100.0)
+    # Engine(num_of_servers=3, queue_size=8)
+    engine.run(num_of_clients=2, lam=6, sim_time=30.0)

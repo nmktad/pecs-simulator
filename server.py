@@ -12,6 +12,8 @@ class Server:
         self.busy = False
         self.current_message = None
         self.scheduler = scheduler
+        self.total_service_time = 0.0
+        self.served_count = 0
 
     def is_busy(self) -> bool:
         return self.busy
@@ -20,6 +22,17 @@ class Server:
         self.busy = state
         self.current_message = message
 
-    def create_event(self, message, current_time) -> Event:
+    def get_service(self, message, current_time) -> Event:
         service_time = random.expovariate(self.mu)
-        return Event(message, EventType.DEPT, current_time + service_time)
+        event = Event(message, EventType.DEPT, current_time + service_time)
+        self.scheduler.add_event(event)
+        return event
+
+    def update_departure_metrics(self, message) -> None:
+        self.total_service_time += message.get_service_time()
+        self.served_count += 1
+
+    def get_avg_service_time(self):
+        if self.served_count == 0:
+            return None
+        return self.total_service_time / self.served_count

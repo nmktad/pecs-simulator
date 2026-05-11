@@ -33,5 +33,8 @@ class Message:
     def get_sojourn_time(self) -> float:
         return self.departure_time - self.arrival_time
 
+    def get_service_time(self) -> float:
+        return self.departure_time - self.service_start_time
+
     def print_message(self) -> None:
         print(f"[Message {self.id}] {self.source} -> {self.destination}")
