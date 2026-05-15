@@ -11,6 +11,10 @@ class EventType(Enum):
 class Event:
     event_id_iter = itertools.count()
 
+    @classmethod
+    def reset_counter(cls):
+        cls.event_id_iter = itertools.count()
+
     def __lt__(self, other):
         return self.time < other.time
 

@@ -12,6 +12,10 @@ class Message:
         self.service_start_time = 0.0
         self.departure_time = 0.0
 
+    @classmethod
+    def reset_counter(cls):
+        cls.msg_id_iter = itertools.count()
+
     def get_id(self) -> int:
         return self.id
 

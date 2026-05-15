@@ -4,7 +4,13 @@ from server import Server
 
 
 class Gateway:
-    def __init__(self, scheduler, num_of_servers=1, queue_size=float("inf"), mu=8):
+    def __init__(
+        self,
+        scheduler,
+        num_of_servers: int = 1,
+        queue_size: float = float("inf"),
+        mu: float = 8.0,
+    ):
         self.scheduler = scheduler
         self.servers = [Server(scheduler, mu=mu) for _ in range(num_of_servers)]
         self.queue = Queue(queue_size)

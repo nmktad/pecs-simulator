@@ -6,7 +6,11 @@ from event import Event, EventType
 class Server:
     server_id_iter = itertools.count()
 
-    def __init__(self, scheduler, mu=8) -> None:
+    @classmethod
+    def reset_counter(cls):
+        cls.server_id_iter = itertools.count()
+
+    def __init__(self, scheduler, mu: float = 8.0) -> None:
         self.id = next(Server.server_id_iter)
         self.mu = mu
         self.busy = False

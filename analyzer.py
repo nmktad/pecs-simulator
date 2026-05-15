@@ -224,15 +224,15 @@ def plot_results(summary: list[dict], output_dir: Path) -> None:
         print(f"Saved plot: {metric_key}.png")
 
 
-def main() -> None:
-    replications = 30
-    sim_time = 1000.0
-    mu = 8.0
-    seed = 42
-    lambdas = [4.0, 6.0, 8.0, 12.0]
-    models = ["M/M/1", "M/M/1/4", "M/M/1/8", "M/M/3/8"]
-
-    output_dir = Path("results")
+def run_analysis(
+    replications: int,
+    sim_time: float,
+    mu: float,
+    seed: int,
+    lambdas: list[float],
+    models: list[str],
+    output_dir: Path,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     raw_rows = []
@@ -257,6 +257,18 @@ def main() -> None:
     write_csv(output_dir / "summary_ci95.csv", summary)
     plot_results(summary, output_dir)
     print(f"\nDone. Results in {output_dir}/")
+
+
+def main() -> None:
+    run_analysis(
+        replications=100,
+        sim_time=30.0,
+        mu=8.0,
+        seed=42,
+        lambdas=[4.0, 6.0, 8.0, 12.0],
+        models=["M/M/1", "M/M/1/4", "M/M/1/8", "M/M/3/8"],
+        output_dir=Path("results"),
+    )
 
 
 if __name__ == "__main__":
